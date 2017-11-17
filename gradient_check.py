@@ -14,7 +14,6 @@ def _as_iterable(x):
 
 
 def _as_function(f, df):
-    print('Function')
     class _Function(function.Function):
         def forward(self, inputs):
             return _as_iterable(f(*inputs))
@@ -22,13 +21,10 @@ def _as_function(f, df):
         def backward(self, inputs, grad_outputs):
             return _as_iterable(df(*inputs, *grad_outputs))
 
-    def _func(*inputs):
-        return _Function()(*inputs)
-    return _func
+    return lambda *inputs: _Function()(*inputs)
 
 
 def _as_function_node(f, df):
-    print('FunctionNode')
     class _FunctionNode(function_node.FunctionNode):
         def forward(self, inputs):
             self.retain_inputs(tuple(range(len(inputs))))
@@ -36,13 +32,13 @@ def _as_function_node(f, df):
 
         def backward(self, indexes, grad_outputs):
             inputs = self.get_retained_inputs()
-            return _as_iterable(df(*(inputs + grad_outputs)))
+            return _as_iterable(df(*inputs, *grad_outputs))
 
     def _func(*inputs):
-        y = _FunctionNode().apply(_as_iterable(inputs))
-        if len(y) == 1:
-            return y[0]
-        return y
+        output = _FunctionNode().apply(_as_iterable(inputs))
+        if isinstance(output, tuple) and len(output) == 1:
+            output, = output
+        return output
     return _func
 
 
@@ -139,7 +135,7 @@ def check_backward(f, df, input_shapes, make_inputs=None,
         grad_outputs = _generate_ndarray(make_grad_outputs, output_shapes)
 
     # Use `chainer.function.Function` or `chainer.function_node.FunctionNode`
-    # based on the class types of the outputs of `df`.
+    # depnding on the class types of the outputs of `df`.
     grads = df(*inputs, *grad_outputs)
     grads = filter(lambda g: g is not None, grads)
     is_grad_variables = [isinstance(g, Variable) for g in grads]
@@ -151,7 +147,7 @@ def check_backward(f, df, input_shapes, make_inputs=None,
     elif all(is_grad_ndarrays):
         func = _as_function(f, df)
     else:
-        raise ValueError('Cannot mix Variables and numpy/cupy ndarrays.')
+        raise ValueError('Cannot mix Variables and NumPy/CuPy ndarrays.')
 
     gradient_check.check_backward(
         func, inputs, grad_outputs, eps=eps, atol=atol, rtol=rtol,
