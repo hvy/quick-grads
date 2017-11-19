@@ -7,14 +7,42 @@ from chainer import gradient_check
 from chainer import Variable
 
 
+def _xp(device):
+    if device < 0:
+        return numpy
+    elif cuda.available:
+        cuda.get_device_from_id(device).use()
+        return cuda.cupy
+    raise ValueError('Tried to use the GPU but CuPy was not available.')
+
+
 def _as_iterable(x):
-    if isinstance(x, (tuple, list)):
+    if hasattr(x, '__iter__'):
         return x
     return x,
 
 
+def _get_ndarray_uniform_sampler(device, dtype='f'):
+    xp = _xp(device)
+    return lambda shape: xp.random.uniform(-1, 1, shape, dtype=dtype)
+
+
+def _sample_ndarrays(sampler, shapes):
+    if callable(sampler):
+        arr = tuple(sampler(shape) for shape in shapes)
+    elif len(sampler) == len(shapes):
+        arr = tuple(
+            _sampler(shape) for _sampler, shape in zip(sampler, shapes))
+    else:
+        raise ValueError(
+            'Array specific generators were given but the number of'
+            'generators did not match the number of inputs.')
+    return arr
+
+
 def _as_function(f, df):
     class _Function(function.Function):
+
         def forward(self, inputs):
             return _as_iterable(f(*inputs))
 
@@ -26,6 +54,7 @@ def _as_function(f, df):
 
 def _as_function_node(f, df):
     class _FunctionNode(function_node.FunctionNode):
+
         def forward(self, inputs):
             self.retain_inputs(tuple(range(len(inputs))))
             return _as_iterable(f(*inputs))
@@ -42,41 +71,9 @@ def _as_function_node(f, df):
     return _func
 
 
-def _make_rnd_data(shape, dtype='f', xp=numpy):
-    return xp.random.uniform(-1, 1, shape).astype(dtype)
-
-
-def make_rnd_data_numpy(shape, dtype='f'):
-    """Generates a NumPy ndarray with random data of given shape.
-
-    Args:
-        shape (tuple): Shape of ndarray to generate.
-        dtype (str or type): Dtype of array to generate. Default is 'f'.
-
-    Return:
-        numpy.ndarray: Random NumPy ndarray.
-
-    """
-    return _make_rnd_data(shape, dtype, numpy)
-
-
-def make_rnd_data_cupy(shape, dtype='f'):
-    """Generates a CuPy ndarray with random data of given shape.
-
-    Args:
-        shape (tuple): Shape of ndarray to generate.
-        dtype (str or type): Dtype of array to generate. Default is 'f'.
-
-    Return:
-        numpy.ndarray: Random CuPy ndarray.
-
-    """
-    return _make_rnd_data(shape, dtype, cuda.cupy)
-
-
 def check_backward(f, df, input_shapes, make_inputs=None,
                    make_grad_outputs=None, inputs=None, grad_outputs=None,
-                   gpu=-1, atol=1e-5, rtol=1e-4, eps=1e-3, no_grads=None):
+                   device=-1, atol=1e-5, rtol=1e-4, eps=1e-3, no_grads=None):
     """Check the gradient computations of the given function.
 
     Inputs and upstream gradients are randomly generated to test for the
@@ -94,45 +91,18 @@ def check_backward(f, df, input_shapes, make_inputs=None,
         make_data (function):
 
     """
-    if make_inputs is None or make_grad_outputs is None:
-        if gpu < 0:
-            xp = numpy
-        else:
-            if cuda.available:
-                cuda.get_device_from_id(gpu).use()
-                xp = cuda.cupy
-            else:
-                raise ValueError(
-                    'Tried to use the GPU but CuPy was not available.')
-        if make_inputs is None:
-            make_inputs = \
-                lambda shape: _make_rnd_data(shape, dtype='f', xp=xp)
-        if make_grad_outputs is None:
-            make_grad_outputs = \
-                lambda shape: _make_rnd_data(shape, dtype='f', xp=xp)
-
-    assert make_inputs is not None
-    assert make_grad_outputs is not None
-
-    def _generate_ndarray(_generator, _shapes):
-        if callable(_generator):
-            arr = tuple(_generator(shape) for shape in _shapes)
-        elif len(_generator) == len(_shapes):
-            arr = tuple(
-                _generator(shape) for shape in zip(_generator, _shapes))
-        else:
-            raise ValueError(
-                'Array specific generators were given but the number of'
-                'generators did not match the number of inputs.')
-        return arr
+    def _make_ndarrays(_sampler, _shapes):
+        if _sampler is None:
+            _sampler = _get_ndarray_uniform_sampler(device, dtype='f')
+        return _sample_ndarrays(_sampler, _shapes)
 
     if inputs is None:
-        inputs = _generate_ndarray(make_inputs, input_shapes)
+        inputs = _make_ndarrays(make_inputs, input_shapes)
 
     outputs = f(*inputs)
     output_shapes = [output.shape for output in outputs]
     if grad_outputs is None:
-        grad_outputs = _generate_ndarray(make_grad_outputs, output_shapes)
+        grad_outputs = _make_ndarrays(make_grad_outputs, output_shapes)
 
     # Use `chainer.function.Function` or `chainer.function_node.FunctionNode`
     # depnding on the class types of the outputs of `df`.
