@@ -87,7 +87,8 @@ def check_backward(f, df, input_shapes, make_inputs=None,
     def _make_ndarrays(_sampler, _shapes):
         if _sampler is None:
             xp = _get_array_module(device)  # NumPy or CuPy
-            _sampler = lambda shape: xp.random.uniform(-1, 1, shape, dtype='f')
+            _sampler = \
+                lambda shape: xp.random.uniform(-1, 1, shape).astype('f')
         return _sample_ndarrays(_sampler, _shapes)
 
     if inputs is None:
