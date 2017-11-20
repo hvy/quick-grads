@@ -1,4 +1,4 @@
-# Quick Gradient Check
+# Easy Numerical Gradient Check
 
 This module includes a single function, `check_gradient()` to perform [numerical gradient check](https://en.wikipedia.org/wiki/Numerical_differentiation) on NumPy and [CuPy](https://github.com/cupy/cupy) ndarrays as well as [Chainer](https://github.com/chainer/chainer) variable objects. 
 
