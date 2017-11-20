@@ -1,6 +1,6 @@
 # Easy Numerical Gradient Check
 
-This module includes a single function, `check_gradient()` to perform [numerical gradient check](https://en.wikipedia.org/wiki/Numerical_differentiation) on NumPy and [CuPy](https://github.com/cupy/cupy) ndarrays as well as [Chainer](https://github.com/chainer/chainer) variable objects. 
+A single function, `check_gradient()` to perform [numerical gradient check](https://en.wikipedia.org/wiki/Numerical_differentiation) on NumPy and [CuPy](https://github.com/cupy/cupy) ndarrays as well as [Chainer](https://github.com/chainer/chainer) variable objects. 
 
 The gradient check can be used to "check" the correctness of an analytical gradient function by comparing the output results with numerically computed ones. If the analytical gradients are wrong, `check_gradient()` raises an error. Otherwise, it does nothing. This gradient check basically wraps the gradient check of Chainer, but allows the user to skip having to implement `chainer.function.Function`s or `chainer.function_node.FunctionNode`s.
 
