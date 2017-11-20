@@ -23,8 +23,8 @@ def df_wrong(x, gy):
     gx = x * x * gy
     return gx
     
-check_gradient(f, df, input_shapes=((3, 4), (3, 4)))  # No error    
-check_gradient(f, df_wrong, input_shapes=((3, 4), (3, 4)))  # Raises an error
+check_gradient(f, df, input_shapes=((3, 4),))  # No error    
+check_gradient(f, df_wrong, input_shapes=((3, 4),))  # Raises an error
 
 ```
 
