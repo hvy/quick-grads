@@ -8,7 +8,7 @@ from chainer import Variable
 
 
 def _as_iterable(x):
-    if hasattr(x, '__iter__'):
+    if isinstance(x, (tuple, list)):
         return x
     return x,
 
@@ -136,15 +136,16 @@ def check_gradient(f, df, input_shapes, make_inputs=None,
     def _make_ndarrays(_sampler, _shapes):
         if _sampler is None:
             xp = _get_array_module(device)  # NumPy or CuPy
-            _sampler = \
-                lambda shape: xp.random.uniform(-1, 1, shape).astype('f')
+
+            def _sampler(shape):
+                return xp.random.uniform(-1, 1, shape).astype('f')
         return _sample_ndarrays(_sampler, _shapes)
 
     if inputs is None:
         inputs = _make_ndarrays(make_inputs, input_shapes)
 
     if grad_outputs is None:
-        output_shapes = [output.shape for output in f(*inputs)]
+        output_shapes = [output.shape for output in _as_iterable(f(*inputs))]
         grad_outputs = _make_ndarrays(make_grad_outputs, output_shapes)
 
     # Use `chainer.function.Function` or `chainer.function_node.FunctionNode`
